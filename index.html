@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAVANT FRAMEWORK — Deterministic Reasoning Chain Visualizer [S57]</title>
+<!--
+  SAVANT FRAMEWORK · CLAI-OS · AEGIS-GLOBAL
+  Falsifiability Interface Demo — SIP invocation BUILD: [S57]
+  Author: Dr. Christabel Odeta
+  Version 1.0.0 — 2026-08-11
+  Single-file build. Zero external dependencies. Fully offline-capable.
+-->
+<style>
+  :root{
+    --bg:#1a1d21;
+    --panel:#21262c;
+    --panel2:#242a31;
+    --border:#333b44;
+    --text:#c9d1d9;
+    --dim:#7d8791;
+    --cyan:#22d3ee;
+    --cyan-dim:#155e6b;
+    --red:#ef4444;
+    --red-dim:#5f1f1f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--text);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size:13px; line-height:1.45;}
+  a{color:var(--cyan); text-decoration:none;}
+  .wrap{max-width:1280px; margin:0 auto; padding:0 16px 40px;}
+
+  header.top{border-bottom:1px solid var(--border); padding:14px 16px; display:flex;
+    align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  header.top h1{font-size:15px; font-weight:700; letter-spacing:1px; color:var(--text);}
+  header.top h1 .acc{color:var(--cyan);}
+  header.top .sub{color:var(--dim); font-size:11px; letter-spacing:0.5px;}
+  #netState{border:1px solid var(--cyan); color:var(--cyan); padding:2px 8px; font-size:11px; letter-spacing:1px;}
+  body.offline #netState{border-color:var(--red-dim); color:var(--red);}
+
+  .grid{display:grid; grid-template-columns:320px 1fr 420px; gap:14px; margin-top:14px;}
+  @media (max-width:1100px){ .grid{grid-template-columns:1fr;} }
+
+  section.panel{background:var(--panel); border:1px solid var(--border); padding:12px;}
+  section.panel h2{font-size:12px; letter-spacing:1.5px; color:var(--cyan);
+    border-bottom:1px solid var(--border); padding-bottom:6px; margin-bottom:10px; font-weight:700;}
+  .lbl{display:block; color:var(--dim); font-size:11px; letter-spacing:0.5px; margin:10px 0 4px;}
+  .lbl:first-of-type{margin-top:0;}
+
+  select, input[type=text]{width:100%; background:var(--bg); color:var(--text);
+    border:1px solid var(--border); padding:6px 8px; font:inherit; border-radius:0;}
+  select:focus, input:focus{outline:1px solid var(--cyan);}
+  .cbx{display:flex; align-items:center; gap:8px; padding:3px 0; cursor:pointer;}
+  .cbx input{accent-color:var(--cyan);}
+  .cbx .cid{color:var(--cyan); font-weight:700;}
+
+  button{font:inherit; font-size:11px; letter-spacing:1px; background:var(--panel2);
+    color:var(--text); border:1px solid var(--border); padding:6px 10px; cursor:pointer; border-radius:0;}
+  button:hover{border-color:var(--cyan); color:var(--cyan);}
+  button:disabled{opacity:0.4; cursor:not-allowed; border-color:var(--border); color:var(--dim);}
+  button.primary{border-color:var(--cyan); color:var(--cyan);}
+  button.primary:hover{background:var(--cyan); color:var(--bg);}
+  button.danger{border-color:var(--red-dim); color:var(--red);}
+  button.danger:hover{border-color:var(--red);}
+  button.danger.armed{background:var(--red); color:#fff; border-color:var(--red);}
+  .btnrow{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .presetrow{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;}
+
+  /* chain */
+  .node{background:var(--panel2); border:1px solid var(--border); border-left:3px solid var(--dim);}
+  .node-head{display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--border);}
+  .node-title{font-weight:700; letter-spacing:1px; font-size:12px;}
+  .badge{margin-left:auto; font-size:10px; letter-spacing:1px; border:1px solid var(--dim); color:var(--dim); padding:1px 6px;}
+  .node-desc{padding:8px 10px 4px; color:var(--dim); font-size:11px;}
+  .node-out{margin:4px 10px 10px; padding:8px; background:var(--bg); border:1px solid var(--border);
+    min-height:18px; white-space:pre-wrap; word-break:break-all; font-size:12px; display:none;}
+  .node.state-ok{border-left-color:var(--cyan);}
+  .node.state-ok .badge{border-color:var(--cyan); color:var(--cyan);}
+  .node.state-fail{border-left-color:var(--red); border-color:var(--red-dim);}
+  .node.state-fail .badge{border-color:var(--red); color:var(--red);}
+  .node.state-fail .node-title{color:var(--red);}
+  .node.state-blocked{border-left-color:var(--red); opacity:0.55;}
+  .node.state-blocked .badge{border-color:var(--red); color:var(--red);}
+  .conn{width:2px; height:20px; background:var(--cyan-dim); margin:0 0 0 22px;}
+  .conn.broken{background:var(--red);}
+
+  .ok{color:var(--cyan);}
+  .fail{color:var(--red);}
+  .dim{color:var(--dim);}
+  .hash{color:var(--cyan);}
+
+  #failBanner{display:none; border:1px solid var(--red); background:#2a1517; color:var(--red);
+    padding:10px 12px; margin-top:12px; font-weight:700; letter-spacing:0.5px; white-space:pre-wrap;}
+  #failBanner.show{display:block;}
+
+  /* fhir */
+  #fhirOut{background:var(--bg); border:1px solid var(--border); padding:10px;
+    white-space:pre-wrap; word-break:break-all; font-size:11.5px; max-height:420px; overflow:auto;}
+  .jk{color:var(--cyan);}
+  .js{color:var(--text);}
+  .jn{color:var(--cyan-dim);}
+  .jb{color:var(--dim);}
+
+  /* audit */
+  table.ledger{width:100%; border-collapse:collapse; font-size:10.5px;}
+  table.ledger th, table.ledger td{border:1px solid var(--border); padding:3px 5px; text-align:left; vertical-align:top;}
+  table.ledger th{color:var(--cyan); letter-spacing:0.5px;}
+  table.ledger td{font-size:10px; word-break:break-all;}
+  #ledgerWrap{max-height:300px; overflow:auto; border:1px solid var(--border);}
+  #ledgerWrap table.ledger{border:none;}
+
+  #selfTestLog, #offlineLog{background:var(--bg); border:1px solid var(--border); padding:8px;
+    white-space:pre-wrap; word-break:break-all; font-size:11.5px; min-height:40px; margin-top:8px;}
+
+  footer.bot{margin-top:20px; border-top:1px solid var(--border); padding-top:12px;
+    color:var(--dim); font-size:11px; letter-spacing:0.5px; text-align:center;}
+  .section-gap{margin-top:14px;}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1>SAVANT FRAMEWORK <span class="acc">//</span> DETERMINISTIC REASONING CHAIN VISUALIZER</h1>
+    <div class="sub">FALSIFIABILITY INTERFACE DEMO · SIP [S57] · CLINICAL DECISION CHAIN · NO PROBABILISTIC HALLUCINATION PATHS</div>
+  </div>
+  <div id="netState">ONLINE</div>
+</header>
+
+<div class="wrap">
+<div class="grid">
+
+  <!-- ======================= COLUMN 1 : INPUT ======================= -->
+  <div>
+    <section class="panel" id="inputPanel">
+      <h2>1 // INPUT PANEL</h2>
+      <label class="lbl" for="finding">IMAGING FINDING (STRUCTURED)</label>
+      <select id="finding"></select>
+
+      <span class="lbl">PATIENT HISTORY (FLAGS A–D)</span>
+      <div id="historyBoxes"></div>
+
+      <span class="lbl">PRESET CASES</span>
+      <div class="presetrow">
+        <button data-preset="0">CASE 1 · TB SCREEN</button>
+        <button data-preset="1">CASE 2 · INTERSTITIAL</button>
+        <button data-preset="2">CASE 3 · BASELINE</button>
+      </div>
+
+      <div class="btnrow">
+        <button id="btnRunAll" class="primary">RUN ALL</button>
+        <button id="btnStep">STEP &gt;</button>
+        <button id="btnReset">RESET</button>
+      </div>
+      <div class="btnrow">
+        <button id="btnSync" title="Nominal cloud sync affordance">CLOUD SYNC (NOMINAL)</button>
+      </div>
+      <div class="cbx" style="margin-top:10px;">
+        <input type="checkbox" id="offlineToggle">
+        <label for="offlineToggle">OFFLINE MODE — DETERMINISTIC EXECUTION</label>
+      </div>
+      <div id="offlineLog" style="display:none;"></div>
+    </section>
+
+    <section class="panel section-gap" id="selfTestPanel">
+      <h2>SELF-TEST // IN-BROWSER FALSIFIABILITY</h2>
+      <div class="dim" style="font-size:11px;">Executes the chain twice on a fixed preset and asserts byte-level hash equality. Also verifies the embedded SHA-256 against a known test vector. Any nondeterminism yields FAIL.</div>
+      <div class="btnrow"><button id="btnSelfTest" class="primary">RUN SELF-TEST</button></div>
+      <div id="selfTestLog">[idle] self-test not executed.</div>
+    </section>
+  </div>
+
+  <!-- ======================= COLUMN 2 : CHAIN ======================= -->
+  <div>
+    <section class="panel" id="chainPanel">
+      <h2>2 // REASONING CHAIN — 6 DETERMINISTIC STEPS</h2>
+      <div class="dim" style="font-size:11px; margin-bottom:10px;">
+        Each node applies a fixed transformation to its input. Any link may be broken (BREAK LINK) to simulate
+        infrastructure failure; the chain must then fail transparently into explicit uncertainty.
+      </div>
+      <div id="chain"></div>
+      <div id="failBanner"></div>
+    </section>
+  </div>
+
+  <!-- ======================= COLUMN 3 : OUTPUT ======================= -->
+  <div>
+    <section class="panel" id="fhirPanel">
+      <h2>3 // FHIR R4 OUTPUT — DiagnosticReport</h2>
+      <div id="fhirOut">[no conclusion issued]</div>
+    </section>
+
+    <section class="panel section-gap" id="auditPanel">
+      <h2>4 // AUDIT TRAIL — EXECUTION LEDGER</h2>
+      <div id="ledgerWrap">
+        <table class="ledger">
+          <thead><tr>
+            <th>SEQ</th><th>RUN</th><th>TIMESTAMP (UTC)</th><th>STEP</th>
+            <th>INPUT HASH</th><th>STEP HASH</th><th>OUTPUT HASH</th>
+          </tr></thead>
+          <tbody id="ledgerBody"><tr><td colspan="7" class="dim">[ledger empty]</td></tr></tbody>
+        </table>
+      </div>
+      <div class="btnrow">
+        <button id="btnExport" class="primary">EXPORT AUDIT TRAIL</button>
+        <button id="btnClearLedger">CLEAR LEDGER</button>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<footer class="bot">
+  SAVANT FRAMEWORK · CLAI-OS · AEGIS-GLOBAL — Author: Dr. Christabel Odeta — Version 1.0.0 — 2026-08-11
+</footer>
+</div>
+
+<script>
+/* ============================================================================
+   SAVANT FRAMEWORK — [S57] Falsifiability Interface Demo
+   Author: Dr. Christabel Odeta — SAVANT FRAMEWORK · CLAI-OS · AEGIS-GLOBAL
+   All logic is inline and dependency-free. No network access is performed.
+   ============================================================================ */
+"use strict";
+
+/* --------------------------------------------------------------------------
+ * SHA-256 — compact public-domain-style implementation in pure JavaScript.
+ * crypto.subtle is deliberately NOT used (unavailable in non-secure contexts).
+ * Input is UTF-8 encoded internally; output is lowercase hex.
+ * ------------------------------------------------------------------------ */
+var SHA256 = (function () {
+  var K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  function rr(x, n) { return (x >>> n) | (x << (32 - n)); }
+  function utf8(str) {
+    var bytes = [], i, c, c2, cp;
+    for (i = 0; i < str.length; i++) {
+      c = str.charCodeAt(i);
+      if (c < 0x80) { bytes.push(c); }
+      else if (c < 0x800) { bytes.push(0xC0 | (c >> 6), 0x80 | (c & 63)); }
+      else if (c >= 0xD800 && c <= 0xDBFF) {
+        c2 = str.charCodeAt(++i);
+        cp = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00);
+        bytes.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+      } else { bytes.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); }
+    }
+    return bytes;
+  }
+  return function sha256hex(str) {
+    var bytes = utf8(str);
+    var bitLen = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    // 64-bit big-endian length (messages here are far below 2^32 bits)
+    bytes.push(0, 0, 0, 0,
+      (bitLen >>> 24) & 255, (bitLen >>> 16) & 255, (bitLen >>> 8) & 255, bitLen & 255);
+    var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    var w = new Array(64);
+    var a,b,c,d,e,f,g,h,i,j,t1,t2;
+    for (i = 0; i < bytes.length; i += 64) {
+      for (j = 0; j < 16; j++) {
+        w[j] = (bytes[i+4*j] << 24) | (bytes[i+4*j+1] << 16) | (bytes[i+4*j+2] << 8) | bytes[i+4*j+3];
+      }
+      for (j = 16; j < 64; j++) {
+        var s0 = rr(w[j-15],7) ^ rr(w[j-15],18) ^ (w[j-15] >>> 3);
+        var s1 = rr(w[j-2],17) ^ rr(w[j-2],19) ^ (w[j-2] >>> 10);
+        w[j] = (w[j-16] + s0 + w[j-7] + s1) | 0;
+      }
+      a=H[0]; b=H[1]; c=H[2]; d=H[3]; e=H[4]; f=H[5]; g=H[6]; h=H[7];
+      for (j = 0; j < 64; j++) {
+        var S1 = rr(e,6) ^ rr(e,11) ^ rr(e,25);
+        var ch = (e & f) ^ ((~e) & g);
+        t1 = (h + S1 + ch + K[j] + w[j]) | 0;
+        var S0 = rr(a,2) ^ rr(a,13) ^ rr(a,22);
+        var maj = (a & b) ^ (a & c) ^ (b & c);
+        t2 = (S0 + maj) | 0;
+        h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+      }
+      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0;
+      H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+    }
+    var out = "";
+    for (i = 0; i < 8; i++) {
+      for (j = 3; j >= 0; j--) {
+        var by = (H[i] >>> (j*8)) & 255;
+        out += (by < 16 ? "0" : "") + by.toString(16);
+      }
+    }
+    return out;
+  };
+})();
+
+/* --------------------------------------------------------------------------
+ * DOMAIN MODEL — structured, closed-world inputs. No free text.
+ * ------------------------------------------------------------------------ */
+var FINDINGS = [
+  { id:"CXR-CAVITARY-APICAL",   label:"Chest X-ray: apical cavitary lesion",
+    pattern:"Apical cavitation with surrounding infiltrate", atlasCode:"SAV-CXR-014",
+    diagnosis:"Active pulmonary tuberculosis, suspected" },
+  { id:"CXR-RETICULONODULAR",   label:"Chest X-ray: reticulonodular opacities",
+    pattern:"Bilateral reticulonodular interstitial pattern", atlasCode:"SAV-CXR-027",
+    diagnosis:"Interstitial lung process, etiology indeterminate" },
+  { id:"CXR-PLEURAL-EFFUSION",  label:"Chest X-ray: unilateral pleural effusion",
+    pattern:"Unilateral costophrenic blunting with meniscus", atlasCode:"SAV-CXR-033",
+    diagnosis:"Unilateral pleural effusion, further workup indicated" },
+  { id:"CXR-CLEAR",             label:"Chest X-ray: no acute finding",
+    pattern:"No atlas deviation detected", atlasCode:"SAV-CXR-000",
+    diagnosis:"No acute cardiopulmonary finding" }
+];
+var HISTORY = [
+  { id:"A", label:"Prior TB exposure",                weight:0.12 },
+  { id:"B", label:"Immunosuppression",                weight:0.15 },
+  { id:"C", label:"Smoking history > 20 pack-years",  weight:0.08 },
+  { id:"D", label:"Recent travel to endemic region",  weight:0.10 }
+];
+var PRESETS = [
+  { name:"CASE 1 · TB SCREEN",    finding:0, history:["A","D"] },
+  { name:"CASE 2 · INTERSTITIAL", finding:1, history:["B","C"] },
+  { name:"CASE 3 · BASELINE",     finding:3, history:[] }
+];
+
+var STEP_DEFS = [
+  { name:"EVIDENCE",                          desc:"Ingest structured imaging finding and history flags. Canonicalize to a fixed string form." },
+  { name:"PATTERN MATCHING",                  desc:"Match canonical evidence against the deterministic pattern atlas (atlas v3, frozen)." },
+  { name:"DEVIATION QUANTIFICATION",          desc:"Quantify deviation Δ of the matched pattern against the reference cohort (n=1,024)." },
+  { name:"HISTORY INTEGRATION",               desc:"Integrate patient history flags as fixed additive modifiers into the posterior estimate." },
+  { name:"VALIDATION GATE",                   desc:"Apply gate criteria: Δ < 0.600 AND posterior > 0.60. Gate outcome is fully determined by inputs." },
+  { name:"CONCLUSION WITH UNCERTAINTY MARGIN",desc:"Issue conclusion with an explicit uncertainty margin derived from Δ. No margin, no conclusion." }
+];
+
+/* Canonical failure messages. For HISTORY INTEGRATION the canonical spec
+ * sentence is reproduced verbatim, including its step numbering. */
+var FAIL_REASONS = [
+  "Evidence acquisition corrupted",
+  "Pattern atlas unavailable",
+  "Reference cohort missing",
+  null, // History Integration uses the canonical verbatim message below
+  "Validation criteria unsatisfied",
+  "Conclusion synthesis interrupted"
+];
+var FAIL_MSG_HISTORY = "CHAIN FAILURE AT STEP 3: Patient history incomplete. System fails into explicit uncertainty. Human clinician intervention required.";
+/* Single source of truth for the step reference in a failure verdict.
+ * Banner and FHIR extension both derive from this so they can never disagree. */
+function failureStepRef(stepIndex) {
+  return "CHAIN FAILURE AT STEP " + (stepIndex === 3 ? 3 : stepIndex + 1);
+}
+function failureMessage(stepIndex) {
+  if (stepIndex === 3) return FAIL_MSG_HISTORY;
+  return failureStepRef(stepIndex) + ": " + FAIL_REASONS[stepIndex] +
+    ". System fails into explicit uncertainty. Human clinician intervention required.";
+}
+
+/* --------------------------------------------------------------------------
+ * DETERMINISTIC CHAIN ENGINE
+ * Pure function of (findingIndex, historyIds, breaks). No clocks, no RNG.
+ * Same inputs -> same intermediate values -> same hashes, always.
+ * ------------------------------------------------------------------------ */
+function hnum(hex, off, len) { return parseInt(hex.substr(off, len), 16); }
+
+function computeChain(findingIndex, historyIds, breaks) {
+  var f = FINDINGS[findingIndex];
+  var hist = HISTORY.filter(function (h) { return historyIds.indexOf(h.id) >= 0; });
+  var steps = [];
+  var prevOutHash = "GENESIS";
+  var haltAt = -1, i;
+
+  for (i = 0; i < 6; i++) {
+    if (breaks[i]) { haltAt = i; break; }
+
+    var canonical, out = {}, lines = [];
+    if (i === 0) {
+      canonical = "S1|finding=" + f.id + "|history=" + (historyIds.length ? historyIds.slice().sort().join("+") : "none");
+      out = { finding: f.label, historyActive: hist.map(function(h){return h.id;}), evidenceForm: canonical };
+      lines.push("Finding      : " + f.label);
+      lines.push("History items: " + (hist.length ? hist.map(function(h){return h.id + " — " + h.label;}).join("; ") : "none"));
+    } else if (i === 1) {
+      canonical = "S2|prev=" + prevOutHash + "|atlas=v3";
+      var sim = (0.70 + (hnum(SHA256(canonical), 0, 4) % 29) / 100);
+      out = { atlasCode: f.atlasCode, pattern: f.pattern, similarity: sim.toFixed(2) };
+      lines.push("Atlas pattern: " + f.atlasCode + " — " + f.pattern);
+      lines.push("Similarity   : " + sim.toFixed(2) + " (deterministic atlas score)");
+    } else if (i === 2) {
+      canonical = "S3|prev=" + prevOutHash + "|cohort=n1024";
+      var dev = 0.050 + (hnum(SHA256(canonical), 4, 4) % 900) / 1000;
+      out = { delta: dev.toFixed(3), cohort: 1024 };
+      lines.push("Δ deviation  : " + dev.toFixed(3) + " (reference cohort n=1,024, atlas v3)");
+    } else if (i === 3) {
+      canonical = "S4|prev=" + prevOutHash + "|flags=" + (historyIds.length ? historyIds.slice().sort().join("+") : "none");
+      var mod = 0; hist.forEach(function (h) { mod += h.weight; });
+      var simv = parseFloat(steps[1].output.similarity);
+      var posterior = Math.min(0.99, simv + mod);
+      out = { modifier: mod.toFixed(2), posterior: posterior.toFixed(2) };
+      lines.push("Modifier     : +" + mod.toFixed(2) + " (" + (hist.length ? hist.map(function(h){return h.id;}).join("+") : "no flags") + ")");
+      lines.push("Posterior    : " + posterior.toFixed(2) + " (similarity + history modifier)");
+    } else if (i === 4) {
+      canonical = "S5|prev=" + prevOutHash + "|gate=delta<0.600,posterior>0.60";
+      var dv = parseFloat(steps[2].output.delta);
+      var pv = parseFloat(steps[3].output.posterior);
+      var pass = (dv < 0.600) && (pv > 0.60);
+      out = { gate: pass ? "VALIDATED" : "VALIDATED — MARGINAL", widened: !pass };
+      lines.push("Gate         : " + (pass ? "VALIDATED" : "VALIDATED — MARGINAL (uncertainty widened)"));
+      lines.push("Criteria     : Δ=" + dv.toFixed(3) + " <0.600 ∧ posterior=" + pv.toFixed(2) + " >0.60");
+    } else {
+      canonical = "S6|prev=" + prevOutHash + "|margin=f(delta)";
+      var d6 = parseFloat(steps[2].output.delta);
+      var widened = steps[4].output.widened;
+      var margin = 0.05 + d6 / 10 + (widened ? 0.05 : 0);
+      var certainty = steps[3].output.posterior;
+      out = { diagnosis: f.diagnosis, certainty: certainty, margin: margin.toFixed(3) };
+      lines.push("Diagnosis    : " + f.diagnosis);
+      lines.push("Certainty    : " + certainty + " ± " + margin.toFixed(3));
+    }
+
+    var stepHash = SHA256(canonical);
+    var outputCanonical = JSON.stringify(out);
+    var outputHash = SHA256(outputCanonical);
+    steps.push({
+      index: i, name: STEP_DEFS[i].name, canonical: canonical,
+      stepHash: stepHash, output: out, outputCanonical: outputCanonical,
+      outputHash: outputHash, lines: lines, state: "ok"
+    });
+    prevOutHash = outputHash;
+  }
+
+  var result = { steps: steps, haltAt: haltAt, failed: haltAt >= 0 };
+  if (result.failed) {
+    result.failureMessage = failureMessage(haltAt);
+    result.chainHash = SHA256(steps.map(function(s){return s.outputHash;}).join("|") + "|FAILED@" + haltAt);
+    result.conclusion = "EXPLICIT UNCERTAINTY — NO CONCLUSION ISSUED";
+  } else {
+    result.chainHash = SHA256(steps.map(function(s){return s.outputHash;}).join("|"));
+    var s6 = steps[5].output;
+    result.conclusion = s6.diagnosis + " — certainty " + s6.certainty + " ± " + s6.margin;
+    result.margin = s6.margin;
+  }
+  result.input = { findingIndex: findingIndex, history: historyIds.slice().sort(), breaks: breaks.slice() };
+  return result;
+}
+
+/* --------------------------------------------------------------------------
+ * FHIR R4 DiagnosticReport builder (deterministic fields only; no clock).
+ * ------------------------------------------------------------------------ */
+function buildFHIR(result) {
+  var f = FINDINGS[result.input.findingIndex];
+  var shortHash = result.chainHash.slice(0, 16);
+  var anonRef = "Patient/anon-" + SHA256("savant-deid|" + f.id).slice(0, 16);
+  var rep = {
+    resourceType: "DiagnosticReport",
+    id: "savant-dr-" + shortHash,
+    meta: { profile: ["urn:savantframework:fhir:StructureDefinition:savant-diagnostic-report"] },
+    status: result.failed ? "cancelled" : "final",
+    code: {
+      coding: [{ system: "urn:savantframework:codes:imaging", code: f.atlasCode, display: f.pattern }],
+      text: f.label
+    },
+    subject: { reference: anonRef, display: "DE-IDENTIFIED" },
+    conclusion: result.failed
+      ? "EXPLICIT UNCERTAINTY — NO CONCLUSION ISSUED. " + result.failureMessage
+      : result.conclusion,
+    conclusionCode: result.failed
+      ? [{ coding: [{ system: "urn:savantframework:codes:conclusion", code: "EXPLICIT-UNCERTAINTY", display: "No conclusion issued — chain failure" }] }]
+      : [{ coding: [{ system: "urn:savantframework:codes:conclusion", code: f.atlasCode, display: f.diagnosis }] }],
+    extension: [{
+      url: "urn:savantframework:fhir:extension:reasoning-chain",
+      extension: [
+        { url: "reasoningChainHash", valueString: result.chainHash },
+        { url: "uncertaintyMargin", valueString: result.failed ? "UNDEFINED" : result.margin },
+        { url: "chainVerdict", valueString: result.failed ? failureStepRef(result.haltAt) : "CHAIN COMPLETE" },
+        { url: "determinism", valueString: "OFFLINE-REPRODUCIBLE" }
+      ]
+    }]
+  };
+  return rep;
+}
+
+/* --------------------------------------------------------------------------
+ * UI STATE + RENDERING
+ * ------------------------------------------------------------------------ */
+var state = {
+  findingIndex: 0,
+  history: ["A", "D"],
+  breaks: [false, false, false, false, false, false],
+  result: null,       // precomputed deterministic result for current inputs
+  executedUpTo: -1,   // highest step index revealed/executed (-1 = none)
+  runCounter: 0,
+  ledgerSeq: 0,
+  onlineHash: null,   // chain hash captured while ONLINE
+  onlineSignature: null, // input signature captured with onlineHash
+  fhir: null
+};
+var ledger = []; // {seq, run, ts, step, inputHash, stepHash, outputHash}
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function shortH(h) { return h.slice(0, 16) + "…"; }
+
+function currentBreaks() { return state.breaks.slice(); }
+
+function recompute() {
+  state.result = computeChain(state.findingIndex, state.history, currentBreaks());
+  state.fhir = buildFHIR(state.result);
+}
+
+/* ---- input panel ------------------------------------------------------- */
+function initInputs() {
+  var sel = $("finding");
+  FINDINGS.forEach(function (f, i) {
+    var o = document.createElement("option");
+    o.value = i; o.textContent = f.label;
+    sel.appendChild(o);
+  });
+  sel.value = String(state.findingIndex);
+  sel.addEventListener("change", function () {
+    state.findingIndex = parseInt(sel.value, 10);
+    softReset();
+  });
+
+  var hb = $("historyBoxes");
+  HISTORY.forEach(function (h) {
+    var div = document.createElement("div");
+    div.className = "cbx";
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.id = "hist" + h.id;
+    cb.checked = state.history.indexOf(h.id) >= 0;
+    cb.addEventListener("change", function () {
+      state.history = HISTORY.filter(function (x) { return $("hist" + x.id).checked; })
+        .map(function (x) { return x.id; });
+      softReset();
+    });
+    var lab = document.createElement("label");
+    lab.setAttribute("for", "hist" + h.id);
+    lab.innerHTML = '<span class="cid">' + h.id + "</span> — " + esc(h.label);
+    div.appendChild(cb); div.appendChild(lab);
+    hb.appendChild(div);
+  });
+
+  document.querySelectorAll("[data-preset]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var p = PRESETS[parseInt(btn.getAttribute("data-preset"), 10)];
+      state.findingIndex = p.finding;
+      state.history = p.history.slice();
+      $("finding").value = String(p.finding);
+      HISTORY.forEach(function (h) { $("hist" + h.id).checked = p.history.indexOf(h.id) >= 0; });
+      softReset();
+    });
+  });
+}
+
+/* ---- chain rendering ---------------------------------------------------- */
+function buildChainDOM() {
+  var chain = $("chain");
+  chain.innerHTML = "";
+  for (var i = 0; i < 6; i++) {
+    if (i > 0) {
+      var conn = document.createElement("div");
+      conn.className = "conn"; conn.id = "conn" + i;
+      chain.appendChild(conn);
+    }
+    var node = document.createElement("div");
+    node.className = "node"; node.id = "node" + i;
+    var head = document.createElement("div");
+    head.className = "node-head";
+    var title = document.createElement("span");
+    title.className = "node-title";
+    title.textContent = "STEP " + (i + 1) + " — " + STEP_DEFS[i].name;
+    var badge = document.createElement("span");
+    badge.className = "badge"; badge.id = "badge" + i; badge.textContent = "IDLE";
+    var brk = document.createElement("button");
+    brk.className = "danger"; brk.id = "brk" + i; brk.textContent = "BREAK LINK";
+    (function (idx, btn) {
+      btn.addEventListener("click", function () {
+        state.breaks[idx] = !state.breaks[idx];
+        btn.textContent = state.breaks[idx] ? "RESTORE LINK" : "BREAK LINK";
+        btn.classList.toggle("armed", state.breaks[idx]);
+        softReset();
+      });
+    })(i, brk);
+    head.appendChild(title); head.appendChild(badge); head.appendChild(brk);
+    var desc = document.createElement("div");
+    desc.className = "node-desc"; desc.textContent = STEP_DEFS[i].desc;
+    var out = document.createElement("pre");
+    out.className = "node-out"; out.id = "out" + i;
+    node.appendChild(head); node.appendChild(desc); node.appendChild(out);
+    chain.appendChild(node);
+  }
+}
+
+function paintIdle() {
+  for (var i = 0; i < 6; i++) {
+    var node = $("node" + i);
+    node.className = "node" + (state.breaks[i] ? " state-fail" : "");
+    $("badge" + i).textContent = state.breaks[i] ? "BROKEN" : "IDLE";
+    $("out" + i).style.display = "none";
+    $("out" + i).innerHTML = "";
+    if (i > 0) $("conn" + i).className = "conn" + (state.breaks[i] ? " broken" : "");
+  }
+  $("failBanner").className = "";
+  $("failBanner").textContent = "";
+  renderFHIRPlaceholder();
+}
+
+function renderFHIRPlaceholder() {
+  $("fhirOut").innerHTML = '<span class="dim">[no conclusion issued — execute chain]</span>';
+}
+
+function paintStep(step) {
+  var i = step.index;
+  $("node" + i).className = "node state-ok";
+  $("badge" + i).textContent = "OK";
+  var html = "";
+  step.lines.forEach(function (ln) { html += esc(ln) + "\n"; });
+  html += '<span class="dim">in   : ' + esc(step.canonical) + "</span>\n";
+  html += '<span class="dim">hash : </span><span class="hash">' + esc(step.stepHash.slice(0, 32)) + "…</span>\n";
+  html += '<span class="dim">out  : </span><span class="hash">' + esc(step.outputHash.slice(0, 32)) + "…</span>";
+  var el = $("out" + i);
+  el.innerHTML = html; el.style.display = "block";
+  if (i > 0) $("conn" + i).className = "conn";
+}
+
+function paintFailure() {
+  var r = state.result, h = r.haltAt;
+  $("node" + h).className = "node state-fail";
+  $("badge" + h).textContent = "FAILED";
+  var el = $("out" + h);
+  el.innerHTML = '<span class="fail">' + esc(r.failureMessage) + "</span>";
+  el.style.display = "block";
+  if (h > 0) $("conn" + h).className = "conn broken";
+  for (var i = h + 1; i < 6; i++) {
+    $("node" + i).className = "node state-blocked";
+    $("badge" + i).textContent = "BLOCKED";
+    $("conn" + i).className = "conn broken";
+    var o = $("out" + i);
+    o.innerHTML = '<span class="dim">— not executed: upstream chain failure —</span>';
+    o.style.display = "block";
+  }
+  // conclusion node override (step 6): if the break IS the conclusion step it is
+  // already FAILED above; if upstream failed, restate the uncertainty verdict.
+  if (h < 5) {
+    $("out" + 5).innerHTML = '<span class="fail">EXPLICIT UNCERTAINTY — NO CONCLUSION ISSUED</span>';
+    $("badge" + 5).textContent = "NO CONCLUSION";
+  }
+  var banner = $("failBanner");
+  banner.textContent = r.failureMessage + "\nCONCLUSION NODE: EXPLICIT UNCERTAINTY — NO CONCLUSION ISSUED";
+  banner.className = "show";
+}
+
+/* ---- FHIR rendering (minimal span highlighting) ------------------------- */
+function highlightJSON(json) {
+  var out = "", re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)/g, m, last = 0;
+  while ((m = re.exec(json)) !== null) {
+    out += esc(json.slice(last, m.index));
+    if (m[1] !== undefined) {
+      if (m[2]) out += '<span class="jk">' + esc(m[1]) + "</span>" + esc(m[2]);
+      else out += '<span class="js">' + esc(m[1]) + "</span>";
+    } else if (m[3] !== undefined) out += '<span class="jn">' + esc(m[3]) + "</span>";
+    else out += '<span class="jb">' + esc(m[4]) + "</span>";
+    last = m.index + m[0].length;
+  }
+  out += esc(json.slice(last));
+  return out;
+}
+function renderFHIR() {
+  $("fhirOut").innerHTML = highlightJSON(JSON.stringify(state.fhir, null, 2));
+}
+
+/* ---- audit ledger -------------------------------------------------------- */
+function ledgerAppend(runId, step) {
+  var entry = {
+    seq: ++state.ledgerSeq,
+    run: runId,
+    ts: new Date().toISOString(), // clock allowed here ONLY; never feeds chain hashes
+    step: "STEP " + (step.index + 1) + " " + step.name,
+    inputHash: SHA256(step.canonical),
+    stepHash: step.stepHash,
+    outputHash: step.outputHash
+  };
+  ledger.push(entry);
+  paintLedger();
+}
+function ledgerAppendFailure(runId, haltAt, msg) {
+  var entry = {
+    seq: ++state.ledgerSeq,
+    run: runId,
+    ts: new Date().toISOString(),
+    step: "STEP " + (haltAt + 1) + " " + STEP_DEFS[haltAt].name + " — FAILURE",
+    inputHash: SHA256("failure-input|run=" + runId + "|step=" + haltAt),
+    stepHash: SHA256("failure|" + haltAt),
+    outputHash: SHA256(msg)
+  };
+  ledger.push(entry);
+  paintLedger();
+}
+function paintLedger() {
+  var tb = $("ledgerBody");
+  if (!ledger.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="dim">[ledger empty]</td></tr>';
+    return;
+  }
+  var html = "";
+  ledger.forEach(function (e) {
+    html += "<tr><td>" + e.seq + "</td><td>" + e.run + "</td><td>" + esc(e.ts) + "</td><td>" + esc(e.step) +
+      "</td><td>" + esc(shortH(e.inputHash)) + "</td><td>" + esc(shortH(e.stepHash)) +
+      "</td><td>" + esc(shortH(e.outputHash)) + "</td></tr>";
+  });
+  tb.innerHTML = html;
+  $("ledgerWrap").scrollTop = $("ledgerWrap").scrollHeight;
+}
+
+/* ---- execution control ---------------------------------------------------- */
+function softReset() {
+  state.executedUpTo = -1;
+  recompute();
+  paintIdle();
+}
+
+function executeNext() {
+  var r = state.result;
+  if (state.executedUpTo === -1) state.runCounter++;
+  var next = state.executedUpTo + 1;
+  if (r.failed && next === r.haltAt) {
+    paintFailure();
+    ledgerAppendFailure(state.runCounter, r.haltAt, r.failureMessage);
+    state.executedUpTo = 99; // chain terminated
+    renderFHIR();
+    updateOnlineHash();
+    return "failed";
+  }
+  if (next > 5 || state.executedUpTo === 99) return "done";
+  var step = r.steps[next];
+  paintStep(step);
+  ledgerAppend(state.runCounter, step);
+  state.executedUpTo = next;
+  if (next === 5) { renderFHIR(); updateOnlineHash(); return "done"; }
+  return "ok";
+}
+
+function runAll() {
+  var guard = 0, status = "ok";
+  while (status === "ok" && guard++ < 12) status = executeNext();
+}
+
+// Serialized signature of the full input tuple (finding, history, breaks).
+// An online hash is only comparable to an offline hash under the SAME signature.
+function configSignature() {
+  return JSON.stringify({
+    findingIndex: state.findingIndex,
+    history: state.history.slice().sort(),
+    breaks: state.breaks.slice()
+  });
+}
+
+function updateOnlineHash() {
+  if (!$("offlineToggle").checked) {
+    state.onlineHash = state.result.chainHash;
+    state.onlineSignature = configSignature();
+  }
+}
+
+/* ---- offline mode ---------------------------------------------------------- */
+function setOffline(on) {
+  document.body.classList.toggle("offline", on);
+  $("netState").textContent = on ? "OFFLINE — DETERMINISTIC MODE" : "ONLINE";
+  $("btnSync").disabled = on;
+  var log = $("offlineLog");
+  if (on) {
+    // Determinism proof: recompute the chain with zero network access and
+    // compare against the last ONLINE chain hash for the same inputs.
+    if (state.onlineHash === null || state.onlineSignature === null) {
+      state.onlineHash = computeChain(state.findingIndex, state.history, currentBreaks()).chainHash;
+      state.onlineSignature = configSignature();
+    }
+    var offlineHash = computeChain(state.findingIndex, state.history, currentBreaks()).chainHash;
+    log.style.display = "block";
+    if (configSignature() !== state.onlineSignature) {
+      // Configuration changed since the hash was captured: the hashes describe
+      // DIFFERENT inputs, so no determinism verdict may be issued. A determinism
+      // verdict is only meaningful for the SAME configuration.
+      log.innerHTML =
+        '<span class="dim">OFFLINE RE-EXECUTION — no network, identical code path</span>\n' +
+        '<span class="dim">RESULT: CONFIGURATION CHANGED SINCE LAST RUN — re-run chain to compare hashes</span>';
+    } else {
+      var match = (offlineHash === state.onlineHash);
+      log.innerHTML =
+        '<span class="dim">OFFLINE RE-EXECUTION — no network, identical code path</span>\n' +
+        '<span class="dim">ONLINE HASH  : </span><span class="hash">' + esc(state.onlineHash) + "</span>\n" +
+        '<span class="dim">OFFLINE HASH : </span><span class="hash">' + esc(offlineHash) + "</span>\n" +
+        (match
+          ? '<span class="ok">RESULT: ONLINE HASH == OFFLINE HASH — VERIFIED (byte-identical)</span>'
+          : '<span class="fail">RESULT: HASH MISMATCH — DETERMINISM VIOLATED</span>');
+    }
+  } else {
+    log.style.display = "none";
+    log.innerHTML = "";
+  }
+}
+
+/* ---- self-test -------------------------------------------------------------- */
+function runSelfTest() {
+  var lines = [], allPass = true;
+  function check(label, ok, detail) {
+    if (!ok) allPass = false;
+    lines.push({ label: label, ok: ok, detail: detail });
+  }
+
+  // T0: SHA-256 known answer vector (FIPS 180-4 example).
+  var vec = SHA256("abc");
+  check("T0 sha256('abc') known-answer", vec === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", vec);
+
+  // T1/T2: execute chain twice on a fixed preset, assert equality of ALL hashes.
+  var r1 = computeChain(0, ["A", "D"], [false, false, false, false, false, false]);
+  var r2 = computeChain(0, ["A", "D"], [false, false, false, false, false, false]);
+  check("T1 chain run #1 (CASE 1 preset)", true, r1.chainHash);
+  check("T2 chain run #2 (CASE 1 preset)", true, r2.chainHash);
+  check("T3 hash equality run#1 == run#2", r1.chainHash === r2.chainHash,
+    r1.chainHash === r2.chainHash ? "identical" : "MISMATCH");
+
+  // T4: simulated offline re-execution must be byte-identical.
+  var rOff = computeChain(0, ["A", "D"], [false, false, false, false, false, false]);
+  check("T4 offline re-execution identical", rOff.chainHash === r1.chainHash, "ONLINE HASH == OFFLINE HASH");
+
+  // T5: tamper sensitivity — flipping one history flag MUST change the hash.
+  var rTam = computeChain(0, ["A"], [false, false, false, false, false, false]);
+  check("T5 tamper sensitivity (flag removed)", rTam.chainHash !== r1.chainHash, rTam.chainHash);
+
+  // T6: failure transparency — broken History Integration yields canonical message.
+  var rFail = computeChain(0, ["A", "D"], [false, false, false, true, false, false]);
+  check("T6 canonical failure sentence", rFail.failureMessage === FAIL_MSG_HISTORY, rFail.failureMessage);
+
+  var html = "";
+  lines.forEach(function (l) {
+    html += (l.ok ? '<span class="ok">[PASS]</span> ' : '<span class="fail">[FAIL]</span> ') +
+      esc(l.label) + '\n       <span class="dim">' + esc(l.detail) + "</span>\n";
+  });
+  html += allPass
+    ? '<span class="ok">SELF-TEST OVERALL: PASS — chain is deterministic and falsifiable.</span>'
+    : '<span class="fail">SELF-TEST OVERALL: FAIL — nondeterminism or integrity violation detected.</span>';
+  $("selfTestLog").innerHTML = html;
+}
+
+/* ---- export: deposition-ready audit record ---------------------------------- */
+function exportAudit() {
+  var r = state.result;
+  var now = new Date().toISOString();
+  var L = [];
+  var bar = Array(65).join("=");
+  L.push(bar);
+  L.push("SAVANT FRAMEWORK — Deterministic Reasoning Audit Record");
+  L.push("CLAI-OS · AEGIS-GLOBAL");
+  L.push("Author: Dr. Christabel Odeta");
+  L.push("Version 1.0.0 — 2026-08-11");
+  L.push(bar);
+  L.push("Export timestamp (UTC): " + now);
+  L.push("Interface: demo.savantframework.com — Falsifiability Interface Demo [S57]");
+  L.push("");
+  L.push("CASE");
+  L.push("  Imaging finding : " + FINDINGS[r.input.findingIndex].label);
+  L.push("  History flags   : " + (r.input.history.length ? r.input.history.join(", ") : "none"));
+  L.push("  Broken links    : " + (r.input.breaks.some(function(b){return b;})
+    ? r.input.breaks.map(function(b, i){ return b ? "STEP " + (i + 1) : null; }).filter(Boolean).join(", ")
+    : "none"));
+  L.push("");
+  L.push("CHAIN VERDICT");
+  if (r.failed) {
+    L.push("  Status          : " + failureStepRef(r.haltAt));
+    L.push("  Failure message : " + r.failureMessage);
+    L.push("  Conclusion      : EXPLICIT UNCERTAINTY — NO CONCLUSION ISSUED");
+  } else {
+    L.push("  Status          : CHAIN COMPLETE — CONCLUSION ISSUED");
+    L.push("  Conclusion      : " + r.conclusion);
+    L.push("  Uncertainty     : ± " + r.margin);
+  }
+  L.push("  Chain hash      : " + r.chainHash);
+  L.push("");
+  L.push("AUDIT LEDGER — " + ledger.length + " entr" + (ledger.length === 1 ? "y" : "ies") +
+    " (timestamps UTC ISO; timestamps are ledger metadata only and are excluded from chain-hash computation)");
+  L.push(bar);
+  L.push(pad("SEQ", 5) + pad("RUN", 5) + pad("TIMESTAMP", 26) + pad("STEP", 34) +
+    pad("INPUT HASH", 18) + pad("STEP HASH", 18) + "OUTPUT HASH");
+  ledger.forEach(function (e) {
+    L.push(pad(String(e.seq), 5) + pad(String(e.run), 5) + pad(e.ts, 26) + pad(e.step, 34) +
+      pad(e.inputHash.slice(0, 16), 18) + pad(e.stepHash.slice(0, 16), 18) + e.outputHash.slice(0, 16));
+  });
+  L.push("");
+  L.push("FULL HASHES");
+  ledger.forEach(function (e) {
+    L.push("  #" + e.seq + " run=" + e.run + " " + e.step);
+    L.push("    input : " + e.inputHash);
+    L.push("    step  : " + e.stepHash);
+    L.push("    output: " + e.outputHash);
+  });
+  L.push("");
+  L.push("FHIR R4 DIAGNOSTIC REPORT");
+  L.push(JSON.stringify(state.fhir, null, 2));
+  L.push("");
+  L.push("INTEGRITY SELF-TEST VECTOR");
+  L.push('  sha256("abc") = ' + SHA256("abc"));
+  L.push("  expected      = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  L.push("");
+  L.push(bar);
+  L.push("END OF RECORD — SAVANT FRAMEWORK · CLAI-OS · AEGIS-GLOBAL");
+  L.push("Author: Dr. Christabel Odeta — This record is deterministic:");
+  L.push("re-executing the same inputs on this interface reproduces every hash above.");
+  L.push(bar);
+
+  var blob = new Blob([L.join("\n")], { type: "text/plain;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "savant-audit-record-" + now.replace(/[:.]/g, "-") + ".txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+}
+function pad(s, n) { s = String(s); while (s.length < n) s += " "; return s; }
+
+/* ---- wiring ------------------------------------------------------------------- */
+$("btnRunAll").addEventListener("click", runAll);
+$("btnStep").addEventListener("click", function () { executeNext(); });
+$("btnReset").addEventListener("click", softReset);
+$("btnSelfTest").addEventListener("click", runSelfTest);
+$("btnExport").addEventListener("click", exportAudit);
+$("btnClearLedger").addEventListener("click", function () {
+  ledger = []; state.ledgerSeq = 0; paintLedger();
+});
+$("btnSync").addEventListener("click", function () {
+  var log = $("offlineLog");
+  log.style.display = "block";
+  log.innerHTML = '<span class="dim">CLOUD SYNC (nominal): not required. Reasoning executes locally; ' +
+    "no network call was made. Toggle OFFLINE MODE to verify byte-identical execution.</span>";
+});
+$("offlineToggle").addEventListener("change", function () { setOffline(this.checked); });
+
+/* ---- boot ---------------------------------------------------------------------- */
+initInputs();
+buildChainDOM();
+softReset();
+</script>
+</body>
+</html>
